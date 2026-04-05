@@ -29,7 +29,8 @@ class App:
         self.finger_pos    = None
         self.landmarks     = None
         self.pinching      = False
-        self._was_pinching = False   # detect pinch → release transition
+        self._was_pinching = False
+        self._last_draw_t  = 0.0    # timestamp of last draw_point call
 
     def _get_rainbow_color(self) -> tuple:
         hue = (time.time() * 0.15) % 1.0   # full rainbow cycle every ~6.7s
@@ -58,11 +59,12 @@ class App:
                 if self.ui.button_rect.collidepoint(event.pos):
                     self.tracking = not self.tracking
                     if not self.tracking:
-                        self.canvas.lift_pen()
+                        self.canvas.finalize_stroke()
                         self.finger_pos    = None
                         self.landmarks     = None
                         self.pinching      = False
                         self._was_pinching = False
+                        self._last_draw_t  = 0.0
 
     def _update(self, dt: float):
         frame = self.camera.get_frame()
@@ -81,8 +83,9 @@ class App:
                 color = self._get_rainbow_color()
                 self.canvas.draw_point(*tip_pos, color=color)
                 self.particles.spawn(*tip_pos, color)
+                self._last_draw_t = time.time()
             elif self._was_pinching:
-                # Pen just released — trigger shape recognition exactly once
+                # Pen just lifted — break stroke continuity but keep points
                 self.canvas.lift_pen()
 
             self._was_pinching = pinching
@@ -93,6 +96,11 @@ class App:
             self.landmarks     = None
             self.pinching      = False
             self._was_pinching = False
+
+        # After 0.8s of no drawing, finalize the stroke (runs shape recognition)
+        if self._last_draw_t and (time.time() - self._last_draw_t) > 0.8:
+            self.canvas.finalize_stroke()
+            self._last_draw_t = 0.0
 
     def _render(self, dt: float):
         self.ui.render(

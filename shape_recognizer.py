@@ -6,7 +6,7 @@ from typing import Optional
 MIN_POINTS = 20
 
 # Circle: coefficient of variation of distances from centroid (lower = more circular)
-CIRCLE_CV_THRESHOLD = 0.15
+CIRCLE_CV_THRESHOLD = 0.25   # hand-drawn circles have natural variance
 
 # Rectangle: approxPolyDP epsilon as fraction of arc length
 RECT_EPSILON_RATIO = 0.04
