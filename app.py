@@ -25,15 +25,14 @@ class App:
         self.ui        = UI(self.screen)
         self.particles = ParticleSystem()
 
-        self.tracking      = False
-        self.finger_pos    = None
-        self.landmarks     = None
-        self.pinching      = False
-        self._was_pinching = False
-        self._last_draw_t  = 0.0    # timestamp of last draw_point call
+        self.tracking   = False   # toggled by circle button
+        self.k_held     = False   # True while K is pressed — pen down
+        self.finger_pos = None
+        self.landmarks  = None
+        self._last_draw_t = 0.0
 
     def _get_rainbow_color(self) -> tuple:
-        hue = (time.time() * 0.15) % 1.0   # full rainbow cycle every ~6.7s
+        hue = (time.time() * 0.15) % 1.0
         r, g, b = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
         return (int(r * 255), int(g * 255), int(b * 255))
 
@@ -50,55 +49,54 @@ class App:
                 self._quit()
 
             elif event.type == pygame.KEYDOWN:
-                if event.key in (pygame.K_DELETE, pygame.K_BACKSPACE):
+                if event.key == pygame.K_k:
+                    self.k_held = True
+
+                elif event.key in (pygame.K_DELETE, pygame.K_BACKSPACE):
                     self.canvas.clear()
+                    self._last_draw_t = 0.0
+
                 elif event.key == pygame.K_ESCAPE:
                     self._quit()
+
+            elif event.type == pygame.KEYUP:
+                if event.key == pygame.K_k:
+                    self.k_held = False
+                    # Pen lifted — break stroke continuity, keep points for recognition
+                    self.canvas.lift_pen()
 
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 if self.ui.button_rect.collidepoint(event.pos):
                     self.tracking = not self.tracking
                     if not self.tracking:
                         self.canvas.finalize_stroke()
-                        self.finger_pos    = None
-                        self.landmarks     = None
-                        self.pinching      = False
-                        self._was_pinching = False
-                        self._last_draw_t  = 0.0
+                        self.finger_pos   = None
+                        self.landmarks    = None
+                        self.k_held       = False
+                        self._last_draw_t = 0.0
 
     def _update(self, dt: float):
         frame = self.camera.get_frame()
         self._last_frame = frame
 
-        # Always advance particles so they fade out naturally after tracking stops
         self.particles.update(dt)
 
         if self.tracking and frame is not None:
-            tip_pos, landmarks, pinching = self.tracker.process(frame, FRAME_W, FRAME_H)
+            tip_pos, landmarks = self.tracker.process(frame, FRAME_W, FRAME_H)
             self.landmarks  = landmarks
             self.finger_pos = tip_pos
-            self.pinching   = pinching
 
-            if tip_pos is not None and pinching:
+            if tip_pos is not None and self.k_held:
                 color = self._get_rainbow_color()
                 self.canvas.draw_point(*tip_pos, color=color)
                 self.particles.spawn(*tip_pos, color)
                 self._last_draw_t = time.time()
-            elif self._was_pinching:
-                # Pen just lifted — break stroke continuity but keep points
-                self.canvas.lift_pen()
-
-            self._was_pinching = pinching
         else:
-            if self._was_pinching:
-                self.canvas.lift_pen()
-            self.finger_pos    = None
-            self.landmarks     = None
-            self.pinching      = False
-            self._was_pinching = False
+            self.finger_pos = None
+            self.landmarks  = None
 
-        # After 0.8s of no drawing, finalize the stroke (runs shape recognition)
-        if self._last_draw_t and (time.time() - self._last_draw_t) > 0.8:
+        # After 1.5s of no drawing, finalize stroke (runs shape recognition)
+        if self._last_draw_t and (time.time() - self._last_draw_t) > 1.5:
             self.canvas.finalize_stroke()
             self._last_draw_t = 0.0
 
@@ -109,7 +107,7 @@ class App:
             tracking=self.tracking,
             finger_pos=self.finger_pos,
             landmarks=self.landmarks,
-            pinching=self.pinching,
+            drawing=self.k_held,
             particles=self.particles,
             dt=dt,
         )

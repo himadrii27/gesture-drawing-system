@@ -72,7 +72,7 @@ class UI:
         tracking: bool,
         finger_pos: Optional[tuple],
         landmarks: Optional[List[tuple]],
-        pinching: bool,
+        drawing: bool,
         particles: ParticleSystem,
         dt: float,
     ):
@@ -97,7 +97,7 @@ class UI:
 
         # 5. Hand skeleton overlay
         if tracking and landmarks is not None:
-            self._draw_skeleton(landmarks, finger_pos, pinching)
+            self._draw_skeleton(landmarks, finger_pos, drawing)
 
         # 5b. Particle trail
         particles.draw(self.screen, self._cam_to_screen)
@@ -106,7 +106,7 @@ class UI:
         self._draw_button(tracking)
 
         # 7. Instruction pill
-        self._draw_pill(tracking, pinching)
+        self._draw_pill(tracking, drawing)
 
     # ── Helpers ─────────────────────────────────────────────────────────────────
     def _draw_camera(self, frame: np.ndarray):
@@ -129,26 +129,26 @@ class UI:
         scaled = pygame.transform.smoothscale(canvas_surface, (FRAME_W, FRAME_H))
         self.screen.blit(scaled, (FRAME_X, FRAME_Y))
 
-    def _draw_skeleton(self, landmarks: List[tuple], finger_pos: Optional[tuple], pinching: bool):
+    def _draw_skeleton(self, landmarks: List[tuple], finger_pos: Optional[tuple], drawing: bool):
         """Draw all 21 hand landmarks + connecting bones on screen."""
         screen_pts = [self._cam_to_screen(x, y) for x, y in landmarks]
 
-        # Bone lines — orange when pinching (drawing), white otherwise
-        line_color = (255, 160, 40) if pinching else WHITE
+        # Bone lines — orange when K held (drawing), white otherwise
+        line_color = (255, 160, 40) if drawing else WHITE
         for a, b in HAND_CONNECTIONS:
             pygame.draw.line(self.screen, line_color, screen_pts[a], screen_pts[b], 2)
 
         # Landmark dots
         for i, pt in enumerate(screen_pts):
             is_index_tip = (i == 8)
-            if is_index_tip and pinching:
-                color = (255, 80, 0)   # orange = pen down
+            if is_index_tip and drawing:
+                color  = (255, 80, 0)  # orange = drawing
                 radius = 9
             elif is_index_tip:
-                color = CYAN_DOT       # cyan = pen up / hovering
+                color  = CYAN_DOT      # cyan = hovering
                 radius = 7
             else:
-                color = WHITE
+                color  = WHITE
                 radius = 5
             pygame.draw.circle(self.screen, color, pt, radius)
             pygame.draw.circle(self.screen, WHITE, pt, radius, 1)
@@ -177,13 +177,13 @@ class UI:
         else:
             pygame.draw.circle(self.screen, BTN_ACTIVE, (cx, cy), 10)
 
-    def _draw_pill(self, tracking: bool, pinching: bool = False):
+    def _draw_pill(self, tracking: bool, drawing: bool = False):
         if not tracking:
-            text = "Press ● to start drawing"
-        elif pinching:
+            text = "Press ● to start tracking"
+        elif drawing:
             text = "✏  Drawing...   •   DELETE to clear"
         else:
-            text = "Pinch to draw   •   Open hand to pause   •   DELETE to clear"
+            text = "Hold K to draw   •   DELETE to clear"
 
         text_surf = self.font_pill.render(text, True, DARK_TEXT)
         pad_x, pad_y = 24, 12
