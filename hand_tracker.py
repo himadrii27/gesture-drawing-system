@@ -14,9 +14,10 @@ THUMB_TIP  = 4
 
 _MODEL_PATH = os.path.join(os.path.dirname(__file__), "hand_landmarker.task")
 
-# Pinch threshold: normalized distance between thumb tip and index tip.
-# Tune this — smaller = tighter pinch required to draw.
-PINCH_THRESHOLD = 0.07
+# Hysteresis thresholds — prevents flickering between draw/no-draw states.
+# Once pinching starts (distance < ON), keep drawing until distance > OFF.
+PINCH_ON_THRESHOLD  = 0.09   # enter pinch state (fingers close)
+PINCH_OFF_THRESHOLD = 0.13   # exit pinch state (fingers clearly open)
 
 # Standard MediaPipe hand skeleton connections (landmark index pairs)
 HAND_CONNECTIONS = [
@@ -40,7 +41,8 @@ class HandTracker:
             min_tracking_confidence=0.5,
         )
         self._landmarker = vision.HandLandmarker.create_from_options(options)
-        self._start_ms = int(time.time() * 1000)
+        self._start_ms  = int(time.time() * 1000)
+        self._pinching  = False   # tracks current state for hysteresis
 
     def process(self, frame: np.ndarray, frame_w: int, frame_h: int):
         """
@@ -63,12 +65,21 @@ class HandTracker:
             for p in lm
         ]
 
-        # Pinch = normalized distance between thumb tip and index tip
+        # Pinch detection with hysteresis — avoids rapid flicker
         dx = lm[THUMB_TIP].x - lm[INDEX_TIP].x
         dy = lm[THUMB_TIP].y - lm[INDEX_TIP].y
-        pinching = math.hypot(dx, dy) < PINCH_THRESHOLD
+        dist = math.hypot(dx, dy)
 
-        return landmarks[INDEX_TIP], landmarks, pinching
+        if self._pinching:
+            # Already drawing — only stop when fingers clearly open
+            if dist > PINCH_OFF_THRESHOLD:
+                self._pinching = False
+        else:
+            # Not drawing — only start when fingers clearly close
+            if dist < PINCH_ON_THRESHOLD:
+                self._pinching = True
+
+        return landmarks[INDEX_TIP], landmarks, self._pinching
 
     def close(self):
         self._landmarker.close()
