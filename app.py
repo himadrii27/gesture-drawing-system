@@ -21,8 +21,9 @@ class App:
         self.canvas  = Canvas(FRAME_W, FRAME_H)
         self.ui      = UI(self.screen)
 
-        self.tracking  = False
+        self.tracking   = False
         self.finger_pos = None
+        self.landmarks  = None
 
     def run(self):
         while True:
@@ -48,22 +49,25 @@ class App:
                     if not self.tracking:
                         self.canvas.lift_pen()
                         self.finger_pos = None
+                        self.landmarks  = None
 
     def _update(self):
         frame = self.camera.get_frame()
         self._last_frame = frame
 
         if self.tracking and frame is not None:
-            pos = self.tracker.process(frame, FRAME_W, FRAME_H)
-            if pos is not None:
-                self.canvas.draw_point(*pos)
-                self.finger_pos = pos
+            tip_pos, landmarks = self.tracker.process(frame, FRAME_W, FRAME_H)
+            self.landmarks = landmarks
+
+            if tip_pos is not None:
+                self.canvas.draw_point(*tip_pos)
+                self.finger_pos = tip_pos
             else:
-                # Hand left frame — lift pen so next appearance starts fresh stroke
                 self.canvas.lift_pen()
                 self.finger_pos = None
         else:
             self.finger_pos = None
+            self.landmarks  = None
 
     def _render(self, dt: float):
         self.ui.render(
@@ -71,6 +75,7 @@ class App:
             canvas_surface=self.canvas.surface,
             tracking=self.tracking,
             finger_pos=self.finger_pos,
+            landmarks=self.landmarks,
             dt=dt,
         )
         pygame.display.flip()

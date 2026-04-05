@@ -2,7 +2,8 @@ import pygame
 import random
 import math
 import numpy as np
-from typing import Optional
+from typing import Optional, List
+from hand_tracker import HAND_CONNECTIONS
 
 # ── Palette ────────────────────────────────────────────────────────────────────
 BG_PIXEL_PALETTE = [
@@ -68,7 +69,8 @@ class UI:
         camera_frame: Optional[np.ndarray],
         canvas_surface: pygame.Surface,
         tracking: bool,
-        finger_pos: Optional[tuple[int, int]],
+        finger_pos: Optional[tuple],
+        landmarks: Optional[List[tuple]],
         dt: float,
     ):
         self._pulse_t += dt
@@ -90,11 +92,9 @@ class UI:
             width=3, border_radius=FRAME_RADIUS + 2,
         )
 
-        # 5. Finger tip dot
-        if tracking and finger_pos is not None:
-            sx, sy = self._cam_to_screen(*finger_pos)
-            pygame.draw.circle(self.screen, CYAN_DOT, (sx, sy), 10)
-            pygame.draw.circle(self.screen, WHITE, (sx, sy), 10, 2)
+        # 5. Hand skeleton overlay
+        if tracking and landmarks is not None:
+            self._draw_skeleton(landmarks, finger_pos)
 
         # 6. Circle toggle button
         self._draw_button(tracking)
@@ -122,6 +122,23 @@ class UI:
         """Scale canvas surface to frame size and blit it."""
         scaled = pygame.transform.smoothscale(canvas_surface, (FRAME_W, FRAME_H))
         self.screen.blit(scaled, (FRAME_X, FRAME_Y))
+
+    def _draw_skeleton(self, landmarks: List[tuple], finger_pos: Optional[tuple]):
+        """Draw all 21 hand landmarks + connecting bones on screen."""
+        # Convert all canvas-space coords to screen-space once
+        screen_pts = [self._cam_to_screen(x, y) for x, y in landmarks]
+
+        # Bone lines
+        for a, b in HAND_CONNECTIONS:
+            pygame.draw.line(self.screen, WHITE, screen_pts[a], screen_pts[b], 2)
+
+        # Landmark dots — cyan on index tip when extended, white elsewhere
+        for i, pt in enumerate(screen_pts):
+            is_index_tip = (i == 8 and finger_pos is not None)
+            color = CYAN_DOT if is_index_tip else WHITE
+            radius = 7 if is_index_tip else 5
+            pygame.draw.circle(self.screen, color, pt, radius)
+            pygame.draw.circle(self.screen, WHITE, pt, radius, 1)
 
     def _draw_button(self, active: bool):
         pulse = 0.0
