@@ -3,8 +3,8 @@ import math
 import numpy as np
 from typing import Optional
 
-MIN_POINTS = 40                # enough points to cover most of a shape
-CIRCLE_CV_THRESHOLD = 0.25    # coefficient of variation — low = consistent radius
+MIN_POINTS = 30                # enough points to cover most of a shape
+CIRCLE_CV_THRESHOLD = 0.35    # coefficient of variation — low = consistent radius
 RECT_EPSILON_RATIO  = 0.04    # approxPolyDP tolerance
 
 # Closure: start and end must be within this fraction of the bounding-box diagonal
