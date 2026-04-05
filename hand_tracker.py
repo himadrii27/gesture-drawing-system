@@ -16,8 +16,8 @@ _MODEL_PATH = os.path.join(os.path.dirname(__file__), "hand_landmarker.task")
 
 # Hysteresis thresholds — prevents flickering between draw/no-draw states.
 # Once pinching starts (distance < ON), keep drawing until distance > OFF.
-PINCH_ON_THRESHOLD  = 0.09   # enter pinch state (fingers close)
-PINCH_OFF_THRESHOLD = 0.13   # exit pinch state (fingers clearly open)
+PINCH_ON_THRESHOLD  = 0.06   # enter pinch state — fingers must be clearly touching
+PINCH_OFF_THRESHOLD = 0.12   # exit pinch state — fingers must be clearly open
 
 # Standard MediaPipe hand skeleton connections (landmark index pairs)
 HAND_CONNECTIONS = [
@@ -56,6 +56,7 @@ class HandTracker:
         result = self._landmarker.detect_for_video(mp_image, timestamp_ms)
 
         if not result.hand_landmarks:
+            self._pinching = False   # reset so re-entering frame requires fresh pinch
             return None, None, False
 
         lm = result.hand_landmarks[0]
