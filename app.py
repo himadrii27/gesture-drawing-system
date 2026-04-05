@@ -1,10 +1,13 @@
 import pygame
 import sys
+import colorsys
+import time
 
 from camera import Camera
 from hand_tracker import HandTracker
 from canvas import Canvas
 from ui import UI, WIN_W, WIN_H, FRAME_W, FRAME_H
+from particles import ParticleSystem
 
 FPS = 30
 
@@ -15,22 +18,28 @@ class App:
         self.screen = pygame.display.set_mode((WIN_W, WIN_H))
         pygame.display.set_caption("Gesture Drawing")
 
-        self.clock   = pygame.time.Clock()
-        self.camera  = Camera()
-        self.tracker = HandTracker()
-        self.canvas  = Canvas(FRAME_W, FRAME_H)
-        self.ui      = UI(self.screen)
+        self.clock     = pygame.time.Clock()
+        self.camera    = Camera()
+        self.tracker   = HandTracker()
+        self.canvas    = Canvas(FRAME_W, FRAME_H)
+        self.ui        = UI(self.screen)
+        self.particles = ParticleSystem()
 
         self.tracking   = False
         self.finger_pos = None
         self.landmarks  = None
         self.pinching   = False
 
+    def _get_rainbow_color(self) -> tuple:
+        hue = (time.time() * 0.15) % 1.0   # full rainbow cycle every ~6.7s
+        r, g, b = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
+        return (int(r * 255), int(g * 255), int(b * 255))
+
     def run(self):
         while True:
             dt = self.clock.tick(FPS) / 1000.0
             self._handle_events()
-            self._update()
+            self._update(dt)
             self._render(dt)
 
     def _handle_events(self):
@@ -53,9 +62,12 @@ class App:
                         self.landmarks  = None
                         self.pinching   = False
 
-    def _update(self):
+    def _update(self, dt: float):
         frame = self.camera.get_frame()
         self._last_frame = frame
+
+        # Always advance particles so they fade out naturally after tracking stops
+        self.particles.update(dt)
 
         if self.tracking and frame is not None:
             tip_pos, landmarks, pinching = self.tracker.process(frame, FRAME_W, FRAME_H)
@@ -64,10 +76,10 @@ class App:
             self.pinching   = pinching
 
             if tip_pos is not None and pinching:
-                # Pen down — draw
-                self.canvas.draw_point(*tip_pos)
+                color = self._get_rainbow_color()
+                self.canvas.draw_point(*tip_pos, color=color)
+                self.particles.spawn(*tip_pos, color)
             else:
-                # Pen up — move cursor without drawing
                 self.canvas.lift_pen()
         else:
             self.finger_pos = None
@@ -82,6 +94,7 @@ class App:
             finger_pos=self.finger_pos,
             landmarks=self.landmarks,
             pinching=self.pinching,
+            particles=self.particles,
             dt=dt,
         )
         pygame.display.flip()

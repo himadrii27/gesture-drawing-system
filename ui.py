@@ -4,6 +4,7 @@ import math
 import numpy as np
 from typing import Optional, List
 from hand_tracker import HAND_CONNECTIONS
+from particles import ParticleSystem
 
 # ── Palette ────────────────────────────────────────────────────────────────────
 BG_PIXEL_PALETTE = [
@@ -72,6 +73,7 @@ class UI:
         finger_pos: Optional[tuple],
         landmarks: Optional[List[tuple]],
         pinching: bool,
+        particles: ParticleSystem,
         dt: float,
     ):
         self._pulse_t += dt
@@ -96,6 +98,9 @@ class UI:
         # 5. Hand skeleton overlay
         if tracking and landmarks is not None:
             self._draw_skeleton(landmarks, finger_pos, pinching)
+
+        # 5b. Particle trail
+        particles.draw(self.screen, self._cam_to_screen)
 
         # 6. Circle toggle button
         self._draw_button(tracking)
