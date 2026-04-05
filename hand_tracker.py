@@ -6,7 +6,12 @@ from mediapipe.tasks.python import vision
 import numpy as np
 from typing import Optional
 
-INDEX_TIP = 8
+# MediaPipe Hand landmark indices
+INDEX_TIP = 8    # index fingertip
+INDEX_PIP = 6    # index finger middle knuckle (proximal interphalangeal)
+INDEX_MCP = 5    # index finger base knuckle (metacarpophalangeal)
+MIDDLE_TIP = 12  # middle fingertip (used to distinguish point vs fist)
+
 _MODEL_PATH = os.path.join(os.path.dirname(__file__), "hand_landmarker.task")
 
 
@@ -14,7 +19,6 @@ class HandTracker:
     def __init__(self, max_hands: int = 1, detection_confidence: float = 0.5):
         options = vision.HandLandmarkerOptions(
             base_options=mp_python.BaseOptions(model_asset_path=_MODEL_PATH),
-            # VIDEO mode uses temporal smoothing across frames — far more stable
             running_mode=vision.RunningMode.VIDEO,
             num_hands=max_hands,
             min_hand_detection_confidence=detection_confidence,
@@ -26,10 +30,10 @@ class HandTracker:
 
     def process(self, frame: np.ndarray, frame_w: int, frame_h: int) -> Optional[tuple]:
         """
-        Process an RGB numpy frame (must be contiguous uint8).
-        Returns (x, y) canvas-space pixel coords of the index finger tip,
-        or None if no hand detected.
-        frame_w / frame_h define the output coordinate space (the canvas size).
+        Process an RGB contiguous uint8 frame.
+        Returns (x, y) canvas-space coords of the index fingertip ONLY when
+        the index finger is clearly extended (pointing gesture).
+        Returns None if no hand found or finger is curled/fist.
         """
         timestamp_ms = int(time.time() * 1000) - self._start_ms
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
@@ -38,9 +42,19 @@ class HandTracker:
         if not result.hand_landmarks:
             return None
 
-        tip = result.hand_landmarks[0][INDEX_TIP]
-        x = int(tip.x * frame_w)
-        y = int(tip.y * frame_h)
+        lm = result.hand_landmarks[0]
+
+        # Index finger is extended when its tip is above (lower y) its PIP knuckle
+        # AND the middle finger tip is below the index tip (pointing gesture, not peace sign mess)
+        index_extended = lm[INDEX_TIP].y < lm[INDEX_PIP].y
+        # Extra check: tip must be clearly above the base knuckle
+        tip_above_mcp = lm[INDEX_TIP].y < lm[INDEX_MCP].y
+
+        if not (index_extended and tip_above_mcp):
+            return None
+
+        x = int(lm[INDEX_TIP].x * frame_w)
+        y = int(lm[INDEX_TIP].y * frame_h)
         return (x, y)
 
     def close(self):
