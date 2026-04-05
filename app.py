@@ -24,6 +24,7 @@ class App:
         self.tracking   = False
         self.finger_pos = None
         self.landmarks  = None
+        self.pinching   = False
 
     def run(self):
         while True:
@@ -50,24 +51,28 @@ class App:
                         self.canvas.lift_pen()
                         self.finger_pos = None
                         self.landmarks  = None
+                        self.pinching   = False
 
     def _update(self):
         frame = self.camera.get_frame()
         self._last_frame = frame
 
         if self.tracking and frame is not None:
-            tip_pos, landmarks = self.tracker.process(frame, FRAME_W, FRAME_H)
-            self.landmarks = landmarks
+            tip_pos, landmarks, pinching = self.tracker.process(frame, FRAME_W, FRAME_H)
+            self.landmarks  = landmarks
+            self.finger_pos = tip_pos
+            self.pinching   = pinching
 
-            if tip_pos is not None:
+            if tip_pos is not None and pinching:
+                # Pen down — draw
                 self.canvas.draw_point(*tip_pos)
-                self.finger_pos = tip_pos
             else:
+                # Pen up — move cursor without drawing
                 self.canvas.lift_pen()
-                self.finger_pos = None
         else:
             self.finger_pos = None
             self.landmarks  = None
+            self.pinching   = False
 
     def _render(self, dt: float):
         self.ui.render(
@@ -76,6 +81,7 @@ class App:
             tracking=self.tracking,
             finger_pos=self.finger_pos,
             landmarks=self.landmarks,
+            pinching=self.pinching,
             dt=dt,
         )
         pygame.display.flip()

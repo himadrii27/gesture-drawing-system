@@ -1,16 +1,22 @@
 import os
 import time
+import math
 import mediapipe as mp
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
 import numpy as np
 from typing import Optional
 
-INDEX_TIP = 8
-INDEX_PIP = 6
-INDEX_MCP = 5
+INDEX_TIP  = 8
+INDEX_PIP  = 6
+INDEX_MCP  = 5
+THUMB_TIP  = 4
 
 _MODEL_PATH = os.path.join(os.path.dirname(__file__), "hand_landmarker.task")
+
+# Pinch threshold: normalized distance between thumb tip and index tip.
+# Tune this — smaller = tighter pinch required to draw.
+PINCH_THRESHOLD = 0.07
 
 # Standard MediaPipe hand skeleton connections (landmark index pairs)
 HAND_CONNECTIONS = [
@@ -38,31 +44,31 @@ class HandTracker:
 
     def process(self, frame: np.ndarray, frame_w: int, frame_h: int):
         """
-        Returns (index_tip_pos, landmarks) where:
-          - index_tip_pos: (x, y) in canvas space if index finger is extended, else None
-          - landmarks: list of 21 (x, y) pixel coords in canvas space, or None if no hand
+        Returns (index_tip_pos, landmarks, pinching) where:
+          - index_tip_pos: (x, y) canvas-space coords of index tip (always when hand visible)
+          - landmarks:     list of 21 (x, y) canvas-space coords, or None if no hand
+          - pinching:      True when thumb and index tips are close together (pen-down gesture)
         """
         timestamp_ms = int(time.time() * 1000) - self._start_ms
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=frame)
         result = self._landmarker.detect_for_video(mp_image, timestamp_ms)
 
         if not result.hand_landmarks:
-            return None, None
+            return None, None, False
 
         lm = result.hand_landmarks[0]
 
-        # All 21 landmarks in canvas-space pixel coords
         landmarks = [
             (int(p.x * frame_w), int(p.y * frame_h))
             for p in lm
         ]
 
-        # Only return drawing position when index finger is clearly extended
-        index_extended = lm[INDEX_TIP].y < lm[INDEX_PIP].y
-        tip_above_mcp  = lm[INDEX_TIP].y < lm[INDEX_MCP].y
-        index_tip_pos  = landmarks[INDEX_TIP] if (index_extended and tip_above_mcp) else None
+        # Pinch = normalized distance between thumb tip and index tip
+        dx = lm[THUMB_TIP].x - lm[INDEX_TIP].x
+        dy = lm[THUMB_TIP].y - lm[INDEX_TIP].y
+        pinching = math.hypot(dx, dy) < PINCH_THRESHOLD
 
-        return index_tip_pos, landmarks
+        return landmarks[INDEX_TIP], landmarks, pinching
 
     def close(self):
         self._landmarker.close()
