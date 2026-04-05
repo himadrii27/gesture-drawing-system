@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# MediaPipe model (large binary — download via setup instructions)
+hand_landmarker.task
+
+# Playwright MCP artifacts
+.playwright-mcp/
+
+# macOS
+.DS_Store
+
+# Virtual environments
+venv/
+.venv/
+env/
