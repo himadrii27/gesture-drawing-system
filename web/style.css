@@ -6,6 +6,8 @@ html, body {
   font-family: "SF Pro Display", "Helvetica Neue", Arial, sans-serif;
   background: #000;
   user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
 }
 
 /* Pixel art background */
@@ -26,20 +28,19 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0;
 }
 
-/* Holds the frame + the button overlapping its corner */
+/* Holds the frame + overlapping buttons */
 #scene {
   position: relative;
-  width: 860px;
+  width: min(860px, 100%);
 }
 
-/* Camera + drawing area */
+/* Camera + drawing area — fixed aspect ratio, scales with width */
 #frame-wrapper {
-  width: 860px;
-  height: 520px;
-  border-radius: 40px;
+  width: 100%;
+  aspect-ratio: 860 / 520;
+  border-radius: clamp(12px, 4vw, 40px);
   overflow: hidden;
   box-shadow: 0 0 0 3px #fff;
   position: relative;
@@ -51,22 +52,23 @@ html, body {
   width: 100%; height: 100%;
   object-fit: cover;
   transform: scaleX(-1);
-  border-radius: 40px;
 }
 
 #display-canvas {
   position: absolute;
   inset: 0;
   width: 100%; height: 100%;
-  border-radius: 40px;
 }
 
-/* Toggle button — sits at bottom-right corner of the frame */
+/* ── Buttons ── */
+
+/* Toggle (record) button — bottom-right */
 #toggle-btn {
   position: absolute;
   right: 16px;
   bottom: 16px;
-  width: 56px; height: 56px;
+  width: clamp(44px, 7vw, 56px);
+  height: clamp(44px, 7vw, 56px);
   border-radius: 50%;
   border: 2px solid #fff;
   cursor: pointer;
@@ -87,18 +89,88 @@ html, body {
   to   { box-shadow: 0 0 0 12px rgba(255, 59, 59, 0); }
 }
 
-/* Instruction pill — below the frame */
+/* Mode switch button — top-left */
+#mode-btn {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 2px solid #fff;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  font-size: clamp(11px, 1.6vw, 14px);
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 3;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+#mode-btn:hover { background: rgba(255,255,255,0.2); }
+#mode-btn.fruity-active {
+  background: rgba(60,179,74,0.75);
+  border-color: #3cb34a;
+}
+#mode-btn.lightup-active {
+  background: rgba(255,200,0,0.75);
+  border-color: #ffc800;
+}
+
+/* Draw button — touch-only, bottom-left, hidden on desktop */
+#draw-btn {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  width: clamp(44px, 7vw, 56px);
+  height: clamp(44px, 7vw, 56px);
+  border-radius: 50%;
+  border: 2px solid #fff;
+  cursor: pointer;
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: 20px;
+  outline: none;
+  z-index: 3;
+  display: none; /* hidden until touch device detected */
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s;
+  -webkit-tap-highlight-color: transparent;
+}
+#draw-btn.pressed {
+  background: rgba(255, 160, 40, 0.85);
+  border-color: #ffa028;
+}
+
+/* Instruction pill — inside frame, bottom-center */
 #pill {
-  display: inline-block;
-  margin-top: 16px;
-  align-self: center;
-  background: rgba(255,255,255,0.94);
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  background: rgba(255,255,255,0.92);
   color: #1a1a1a;
-  font-size: 15px;
+  font-size: clamp(11px, 1.5vw, 15px);
   font-weight: 400;
-  padding: 10px 24px;
+  padding: 8px 18px;
   border-radius: 999px;
   white-space: nowrap;
   box-shadow: 2px 4px 12px rgba(0,0,0,0.28);
   pointer-events: none;
+  max-width: calc(100% - 140px); /* leave room for buttons */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* On wide screens, show the draw button only if JS adds .touch class */
+body.touch #draw-btn { display: flex; }
+
+/* On wide screens, move pill slightly up so it doesn't sit on buttons */
+@media (min-width: 600px) {
+  #pill { bottom: 20px; }
 }
